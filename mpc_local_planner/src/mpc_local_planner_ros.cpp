@@ -80,6 +80,7 @@ void MpcLocalPlannerROS::initialize(std::string name, tf2_ros::Buffer* tf, costm
         nh.param("controller/max_global_plan_lookahead_dist", _params.max_global_plan_lookahead_dist, _params.max_global_plan_lookahead_dist);
         nh.param("controller/global_plan_viapoint_sep", _params.global_plan_viapoint_sep, _params.global_plan_viapoint_sep);
         _controller.setInitialPlanEstimateOrientation(_params.global_plan_overwrite_orientation);
+        nh.param("controller/min_abs_vel_theta", _params.min_abs_vel_theta, _params.min_abs_vel_theta);
 
         // special parameters
         nh.param("odom_topic", _params.odom_topic, _params.odom_topic);
@@ -407,7 +408,9 @@ uint32_t MpcLocalPlannerROS::computeVelocityCommands(const geometry_msgs::PoseSt
     // Saturate velocity, if the optimization results violates the constraints (could be possible due to early termination or soft cosntraints).
     // saturateVelocity(cmd_vel.twist.linear.x, cmd_vel.twist.linear.y, cmd_vel.twist.angular.z, cfg_.robot.max_vel_x, cfg_.robot.max_vel_y,
     //                 cfg_.robot.max_vel_theta, cfg_.robot.max_vel_x_backwards);
-
+    if(abs(cmd_vel.twist.angular.z)<_params.min_abs_vel_theta && cmd_vel.twist.angular.z!=0){
+        cmd_vel.twist.angular.z = _params.min_abs_vel_theta*cmd_vel.twist.angular.z/abs(cmd_vel.twist.angular.z);
+    }
     // a feasible solution should be found, reset counter
     _no_infeasible_plans = 0;
 
@@ -421,6 +424,7 @@ uint32_t MpcLocalPlannerROS::computeVelocityCommands(const geometry_msgs::PoseSt
     _publisher.publishGlobalPlan(_global_plan);
     _publisher.publishViaPoints(_via_points);
     _publisher.publishRobotFootprintModel(_robot_pose, *_robot_model);
+
     return mbf_msgs::ExePathResult::SUCCESS;
 }
 

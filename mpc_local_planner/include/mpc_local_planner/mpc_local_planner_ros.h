@@ -420,7 +420,7 @@ class MpcLocalPlannerROS : public nav_core::BaseLocalPlanner, public mbf_costmap
         int collision_check_no_poses                  = -1;
         std::string odom_topic                        = "odom";
         double controller_frequency                   = 10;
-
+        double min_abs_vel_theta                      = 0.0;
     } _params;
 
     struct CostmapConverterPlugin
