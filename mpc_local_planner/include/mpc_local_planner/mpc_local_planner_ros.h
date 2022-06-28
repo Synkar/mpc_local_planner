@@ -421,6 +421,7 @@ class MpcLocalPlannerROS : public nav_core::BaseLocalPlanner, public mbf_costmap
         std::string odom_topic                        = "odom";
         double controller_frequency                   = 10;
         double min_abs_vel_theta                      = 0.0;
+        bool check_blocked_path                       = false;
     } _params;
 
     struct CostmapConverterPlugin

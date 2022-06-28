@@ -88,6 +88,7 @@ void MpcLocalPlannerROS::initialize(std::string name, tf2_ros::Buffer* tf, costm
         nh.param("collision_avoidance/include_costmap_obstacles", _params.include_costmap_obstacles, _params.include_costmap_obstacles);
         nh.param("collision_avoidance/costmap_obstacles_behind_robot_dist", _params.costmap_obstacles_behind_robot_dist,
                  _params.costmap_obstacles_behind_robot_dist);
+        nh.param("collision_avoidance/check_blocked_path", _params.check_blocked_path, _params.check_blocked_path);
 
         nh.param("collision_avoidance/collision_check_no_poses", _params.collision_check_no_poses, _params.collision_check_no_poses);
         nh.param("collision_avoidance/collision_check_min_resolution_angular", _params.collision_check_min_resolution_angular,
@@ -317,6 +318,25 @@ uint32_t MpcLocalPlannerROS::computeVelocityCommands(const geometry_msgs::PoseSt
     }
     transformed_plan.front() = robot_pose;  // update start
 
+
+    //Check for obstacles in the path
+    if(_params.check_blocked_path){
+        for(unsigned int i = 0; i < transformed_plan.size(); ++i){
+            unsigned int px, py;
+            if(!_costmap->worldToMap(transformed_plan[i].pose.position.x, transformed_plan[i].pose.position.y, px, py)){
+                ROS_WARN("Transformed path is out of costmap.");
+                break;
+            }
+
+            unsigned char cost = _costmap->getCost(px, py);
+            if (cost == costmap_2d::LETHAL_OBSTACLE){
+                ROS_WARN("Obstacle detected inside the global path.");
+                message = "The global path is blocked by some obstacle.";
+                return mbf_msgs::ExePathResult::BLOCKED_PATH;
+            }
+        }
+    }
+
     // clear currently existing obstacles
     _obstacles.clear();
 
@@ -421,7 +441,7 @@ uint32_t MpcLocalPlannerROS::computeVelocityCommands(const geometry_msgs::PoseSt
     // Now visualize everything
     _publisher.publishLocalPlan(*_x_seq);
     _publisher.publishObstacles(_obstacles);
-    _publisher.publishGlobalPlan(_global_plan);
+    _publisher.publishGlobalPlan(transformed_plan);
     _publisher.publishViaPoints(_via_points);
     _publisher.publishRobotFootprintModel(_robot_pose, *_robot_model);
 
