@@ -85,6 +85,7 @@ void MpcLocalPlannerROS::reconfigureCollisionCB(CollisionReconfigureConfig& conf
     _params.costmap_obstacles_behind_robot_dist    = config.costmap_obstacles_behind_robot_dist;
     _params.collision_check_min_resolution_angular = config.collision_check_min_resolution_angular;
     _params.collision_check_no_poses               = config.collision_check_no_poses;
+    _params.check_blocked_path                     = config.check_blocked_path;
 }
 
 void MpcLocalPlannerROS::initialize(std::string name, tf2_ros::Buffer* tf, costmap_2d::Costmap2DROS* costmap_ros)
