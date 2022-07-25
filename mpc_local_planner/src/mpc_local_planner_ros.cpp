@@ -367,7 +367,7 @@ uint32_t MpcLocalPlannerROS::computeVelocityCommands(const geometry_msgs::PoseSt
             }
 
             unsigned char cost = _costmap->getCost(px, py);
-            if (cost == costmap_2d::LETHAL_OBSTACLE){
+            if (cost == costmap_2d::LETHAL_OBSTACLE || cost == costmap_2d::INSCRIBED_INFLATED_OBSTACLE){
                 ROS_WARN("Obstacle detected inside the global path.");
                 message = "The global path is blocked by some obstacle.";
                 return mbf_msgs::ExePathResult::BLOCKED_PATH;
