@@ -374,6 +374,21 @@ class MpcLocalPlannerROS : public nav_core::BaseLocalPlanner, public mbf_costmap
      */
     void validateFootprints(double opt_inscribed_radius, double costmap_inscribed_radius, double min_obst_dist);
 
+    /**
+     * @brief Search for lethal costs in the given path within the detection range
+     *  
+     * If any lethal cost is found in the path then this function will return 'false', otherwise it returns 'true'
+     * @param plan_to_global_transform The transform from the given global plan to the costmap frame
+     * @param global_plan The global plan
+     * @param robot_pose The robot pose in costmap frame
+     * @param costmap The costmap
+     * @param detection_range The range of detection
+     */
+    bool checkBlockedPath(const geometry_msgs::TransformStamped& plan_to_global_transform,
+                          const std::vector<geometry_msgs::PoseStamped>& global_plan,
+                          const geometry_msgs::PoseStamped& robot_pose,
+                          const costmap_2d::Costmap2D& costmap, 
+                          double detection_range);
  private:
     // Definition of member variables
 
@@ -433,7 +448,6 @@ class MpcLocalPlannerROS : public nav_core::BaseLocalPlanner, public mbf_costmap
 
     // flags
     bool _initialized;  //!< Keeps track about the correct initialization of this class
-
     struct Parameters
     {
         double xy_goal_tolerance                      = 0.2;
@@ -451,6 +465,7 @@ class MpcLocalPlannerROS : public nav_core::BaseLocalPlanner, public mbf_costmap
         double controller_frequency                   = 10;
         double min_abs_vel_theta                      = 0.0;
         bool check_blocked_path                       = false;
+        double blocked_path_detection_range           = 2.4;
     } _params;
 
     boost::mutex config_mutex_;  //!< Mutex for config accesses and changes

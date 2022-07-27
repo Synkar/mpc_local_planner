@@ -86,6 +86,7 @@ void MpcLocalPlannerROS::reconfigureCollisionCB(CollisionReconfigureConfig& conf
     _params.collision_check_min_resolution_angular = config.collision_check_min_resolution_angular;
     _params.collision_check_no_poses               = config.collision_check_no_poses;
     _params.check_blocked_path                     = config.check_blocked_path;
+    _params.blocked_path_detection_range           = config.blocked_path_detection_range;
 }
 
 void MpcLocalPlannerROS::initialize(std::string name, tf2_ros::Buffer* tf, costmap_2d::Costmap2DROS* costmap_ros)
@@ -116,6 +117,7 @@ void MpcLocalPlannerROS::initialize(std::string name, tf2_ros::Buffer* tf, costm
         nh.param("collision_avoidance/costmap_obstacles_behind_robot_dist", _params.costmap_obstacles_behind_robot_dist,
                  _params.costmap_obstacles_behind_robot_dist);
         nh.param("collision_avoidance/check_blocked_path", _params.check_blocked_path, _params.check_blocked_path);
+        nh.param("collision_avoidance/blocked_path_detection_range", _params.blocked_path_detection_range, _params.blocked_path_detection_range);
 
         nh.param("collision_avoidance/collision_check_no_poses", _params.collision_check_no_poses, _params.collision_check_no_poses);
         nh.param("collision_avoidance/collision_check_min_resolution_angular", _params.collision_check_min_resolution_angular,
@@ -196,7 +198,7 @@ void MpcLocalPlannerROS::initialize(std::string name, tf2_ros::Buffer* tf, costm
             boost::bind(&MpcLocalPlannerROS::reconfigureControllerCB, this, _1, _2);
         dynamic_controller_recfg_->setCallback(controller_cb);
 
-        ros::NodeHandle collision_nh(nh, "collision");
+        ros::NodeHandle collision_nh(nh, "collision_avoidance");
         dynamic_collision_recfg_ = boost::make_shared<dynamic_reconfigure::Server<CollisionReconfigureConfig>>(collision_nh);
         dynamic_reconfigure::Server<CollisionReconfigureConfig>::CallbackType collision_cb =
             boost::bind(&MpcLocalPlannerROS::reconfigureCollisionCB, this, _1, _2);
@@ -250,7 +252,6 @@ bool MpcLocalPlannerROS::setPlan(const std::vector<geometry_msgs::PoseStamped>& 
 
     // reset goal_reached_ flag
     _goal_reached = false;
-
     return true;
 }
 
@@ -309,6 +310,19 @@ uint32_t MpcLocalPlannerROS::computeVelocityCommands(const geometry_msgs::PoseSt
         return mbf_msgs::ExePathResult::INTERNAL_ERROR;
     }
 
+    if(_params.check_blocked_path){
+        if(!checkBlockedPath(tf_plan_to_global,
+                         _global_plan,
+                         robot_pose,
+                         *_costmap,
+                         _params.blocked_path_detection_range)){
+
+            message = "The global path is blocked by some obstacle.";
+            ROS_WARN_STREAM(message.c_str());
+            return mbf_msgs::ExePathResult::BLOCKED_PATH;
+        }
+    }
+
     // update via-points container
     if (!_custom_via_points_active) updateViaPointsContainer(transformed_plan, _params.global_plan_viapoint_sep);
 
@@ -357,24 +371,6 @@ uint32_t MpcLocalPlannerROS::computeVelocityCommands(const geometry_msgs::PoseSt
     transformed_plan.front() = robot_pose;  // update start
 
 
-    //Check for obstacles in the path
-    if(_params.check_blocked_path){
-        for(unsigned int i = 0; i < transformed_plan.size(); ++i){
-            unsigned int px, py;
-            if(!_costmap->worldToMap(transformed_plan[i].pose.position.x, transformed_plan[i].pose.position.y, px, py)){
-                ROS_WARN("Transformed path is out of costmap.");
-                break;
-            }
-
-            unsigned char cost = _costmap->getCost(px, py);
-            if (cost == costmap_2d::LETHAL_OBSTACLE || cost == costmap_2d::INSCRIBED_INFLATED_OBSTACLE){
-                ROS_WARN("Obstacle detected inside the global path.");
-                message = "The global path is blocked by some obstacle.";
-                return mbf_msgs::ExePathResult::BLOCKED_PATH;
-            }
-        }
-    }
-
     // clear currently existing obstacles
     _obstacles.clear();
 
@@ -417,7 +413,6 @@ uint32_t MpcLocalPlannerROS::computeVelocityCommands(const geometry_msgs::PoseSt
     {
         _controller.reset();  // force reinitialization for next time
         ROS_WARN("mpc_local_planner was not able to obtain a local plan for the current setting.");
-
         ++_no_infeasible_plans;  // increase number of infeasible solutions in a row
         _time_last_infeasible_plan = ros::Time::now();
         _last_cmd                  = cmd_vel.twist;
@@ -438,7 +433,6 @@ uint32_t MpcLocalPlannerROS::computeVelocityCommands(const geometry_msgs::PoseSt
     if (!feasible)
     {
         cmd_vel.twist.linear.x = cmd_vel.twist.linear.y = cmd_vel.twist.angular.z = 0;
-
         // now we reset everything to start again with the initialization of new trajectories.
         _controller.reset();  // force reinitialization for next time
         ROS_WARN("MpcLocalPlannerROS: trajectory is not feasible. Resetting planner...");
@@ -452,7 +446,7 @@ uint32_t MpcLocalPlannerROS::computeVelocityCommands(const geometry_msgs::PoseSt
     // Get the velocity command for this sampling interval
     // TODO(roesmann): we might also command more than just the imminent action, e.g. in a separate thread, until a new command is available
     if (!_u_seq || !_controller.getRobotDynamics()->getTwistFromControl(_u_seq->getValuesMap(0), cmd_vel.twist))
-    {
+    {   
         _controller.reset();
         ROS_WARN("MpcLocalPlannerROS: velocity command invalid. Resetting controller...");
         ++_no_infeasible_plans;  // increase number of infeasible solutions in a row
@@ -481,7 +475,6 @@ uint32_t MpcLocalPlannerROS::computeVelocityCommands(const geometry_msgs::PoseSt
     _publisher.publishGlobalPlan(transformed_plan);
     _publisher.publishViaPoints(_via_points);
     _publisher.publishRobotFootprintModel(_robot_pose, *_robot_model);
-
     return mbf_msgs::ExePathResult::SUCCESS;
 }
 
@@ -708,7 +701,38 @@ bool MpcLocalPlannerROS::pruneGlobalPlan(const tf2_ros::Buffer& tf, const geomet
     }
     return true;
 }
+bool MpcLocalPlannerROS::checkBlockedPath(const geometry_msgs::TransformStamped& plan_to_global_transform,
+                                          const std::vector<geometry_msgs::PoseStamped>& global_plan,
+                                          const geometry_msgs::PoseStamped& global_pose,
+                                          const costmap_2d::Costmap2D& costmap, 
+                                          double detection_range){
 
+    geometry_msgs::PoseStamped transformed_pose;
+    //Check for obstacles in the path
+    for(unsigned int i = 0; i < global_plan.size(); ++i){
+
+        tf2::doTransform(global_plan[i], transformed_pose, plan_to_global_transform);
+        double x_diff      = global_pose.pose.position.x - transformed_pose.pose.position.x;
+        double y_diff      = global_pose.pose.position.y - transformed_pose.pose.position.y;
+        double new_sq_dist = x_diff * x_diff + y_diff * y_diff;
+        if(new_sq_dist>detection_range*detection_range){
+          break;
+        }
+
+        unsigned int px, py;
+        if(!costmap.worldToMap(transformed_pose.pose.position.x, transformed_pose.pose.position.y, px, py)){
+            ROS_WARN("The detection range is out of costmap.");
+            break;
+        }
+
+        unsigned char cost = costmap.getCost(px, py);
+        if (cost == costmap_2d::LETHAL_OBSTACLE || cost == costmap_2d::INSCRIBED_INFLATED_OBSTACLE){
+            ROS_WARN("Obstacle detected inside the global path.");
+            return false;
+        }
+    }
+    return true;
+}
 bool MpcLocalPlannerROS::transformGlobalPlan(const tf2_ros::Buffer& tf, const std::vector<geometry_msgs::PoseStamped>& global_plan,
                                              const geometry_msgs::PoseStamped& global_pose, const costmap_2d::Costmap2D& costmap,
                                              const std::string& global_frame, double max_plan_length,
