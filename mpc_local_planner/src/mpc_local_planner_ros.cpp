@@ -310,19 +310,6 @@ uint32_t MpcLocalPlannerROS::computeVelocityCommands(const geometry_msgs::PoseSt
         return mbf_msgs::ExePathResult::INTERNAL_ERROR;
     }
 
-    if(_params.check_blocked_path){
-        if(!checkBlockedPath(tf_plan_to_global,
-                         _global_plan,
-                         robot_pose,
-                         *_costmap,
-                         _params.blocked_path_detection_range)){
-
-            message = "The global path is blocked by some obstacle.";
-            ROS_WARN_STREAM(message.c_str());
-            return mbf_msgs::ExePathResult::BLOCKED_PATH;
-        }
-    }
-
     // update via-points container
     if (!_custom_via_points_active) updateViaPointsContainer(transformed_plan, _params.global_plan_viapoint_sep);
 
@@ -336,6 +323,23 @@ uint32_t MpcLocalPlannerROS::computeVelocityCommands(const geometry_msgs::PoseSt
     {
         _goal_reached = true;
         return mbf_msgs::ExePathResult::SUCCESS;
+    }
+
+    //Check if global path is blocked by some obstacle
+    if(_params.check_blocked_path){
+        if(!checkBlockedPath(tf_plan_to_global,
+                         _global_plan,
+                         robot_pose,
+                         *_costmap,
+                         _params.blocked_path_detection_range)){
+            _controller.reset();
+            ++_no_infeasible_plans;  // increase number of infeasible solutions in a row
+            _time_last_infeasible_plan = ros::Time::now();
+            _last_cmd                  = cmd_vel.twist;
+            message = "The global path is blocked by some obstacle.";
+            ROS_WARN_STREAM(message.c_str());
+            return mbf_msgs::ExePathResult::BLOCKED_PATH;
+        }
     }
 
     // Return false if the transformed global plan is empty
