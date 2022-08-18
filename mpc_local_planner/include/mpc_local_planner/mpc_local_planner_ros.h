@@ -388,7 +388,8 @@ class MpcLocalPlannerROS : public nav_core::BaseLocalPlanner, public mbf_costmap
                           const std::vector<geometry_msgs::PoseStamped>& global_plan,
                           const geometry_msgs::PoseStamped& robot_pose,
                           const costmap_2d::Costmap2D& costmap, 
-                          double detection_range);
+                          double detection_range,
+                          unsigned int lethal_cost);
  private:
     // Definition of member variables
 
@@ -466,6 +467,7 @@ class MpcLocalPlannerROS : public nav_core::BaseLocalPlanner, public mbf_costmap
         double min_abs_vel_theta                      = 0.0;
         bool check_blocked_path                       = false;
         double blocked_path_detection_range           = 2.4;
+        int lethal_cost                               = 254;
     } _params;
 
     boost::mutex config_mutex_;  //!< Mutex for config accesses and changes

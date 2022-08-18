@@ -87,6 +87,7 @@ void MpcLocalPlannerROS::reconfigureCollisionCB(CollisionReconfigureConfig& conf
     _params.collision_check_no_poses               = config.collision_check_no_poses;
     _params.check_blocked_path                     = config.check_blocked_path;
     _params.blocked_path_detection_range           = config.blocked_path_detection_range;
+    _params.lethal_cost                            = config.lethal_cost;
 }
 
 void MpcLocalPlannerROS::initialize(std::string name, tf2_ros::Buffer* tf, costmap_2d::Costmap2DROS* costmap_ros)
@@ -118,6 +119,7 @@ void MpcLocalPlannerROS::initialize(std::string name, tf2_ros::Buffer* tf, costm
                  _params.costmap_obstacles_behind_robot_dist);
         nh.param("collision_avoidance/check_blocked_path", _params.check_blocked_path, _params.check_blocked_path);
         nh.param("collision_avoidance/blocked_path_detection_range", _params.blocked_path_detection_range, _params.blocked_path_detection_range);
+        nh.param("collision_avoidance/lethal_cost", _params.lethal_cost, _params.lethal_cost);
 
         nh.param("collision_avoidance/collision_check_no_poses", _params.collision_check_no_poses, _params.collision_check_no_poses);
         nh.param("collision_avoidance/collision_check_min_resolution_angular", _params.collision_check_min_resolution_angular,
@@ -331,7 +333,8 @@ uint32_t MpcLocalPlannerROS::computeVelocityCommands(const geometry_msgs::PoseSt
                          _global_plan,
                          robot_pose,
                          *_costmap,
-                         _params.blocked_path_detection_range)){
+                         _params.blocked_path_detection_range,
+                         _params.lethal_cost)){
             _controller.reset();
             ++_no_infeasible_plans;  // increase number of infeasible solutions in a row
             _time_last_infeasible_plan = ros::Time::now();
@@ -709,7 +712,8 @@ bool MpcLocalPlannerROS::checkBlockedPath(const geometry_msgs::TransformStamped&
                                           const std::vector<geometry_msgs::PoseStamped>& global_plan,
                                           const geometry_msgs::PoseStamped& global_pose,
                                           const costmap_2d::Costmap2D& costmap, 
-                                          double detection_range){
+                                          double detection_range,
+                                          unsigned int lethal_cost){
 
     geometry_msgs::PoseStamped transformed_pose;
     //Check for obstacles in the path
@@ -730,7 +734,7 @@ bool MpcLocalPlannerROS::checkBlockedPath(const geometry_msgs::TransformStamped&
         }
 
         unsigned char cost = costmap.getCost(px, py);
-        if (cost == costmap_2d::LETHAL_OBSTACLE || cost == costmap_2d::INSCRIBED_INFLATED_OBSTACLE){
+        if (int(cost) >= lethal_cost){
             ROS_WARN("Obstacle detected inside the global path.");
             return false;
         }
