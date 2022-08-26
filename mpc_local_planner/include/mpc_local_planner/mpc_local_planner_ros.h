@@ -171,7 +171,7 @@ class MpcLocalPlannerROS : public nav_core::BaseLocalPlanner, public mbf_costmap
      * @remark New on MBF API
      * @return True if a cancel has been successfully requested, false if not implemented.
      */
-    bool cancel() { return false; };
+    bool cancel() { _controller.reset(); return false; };
 
     /** @name Public utility functions/methods */
     //@{
