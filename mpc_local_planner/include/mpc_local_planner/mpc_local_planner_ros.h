@@ -468,6 +468,7 @@ class MpcLocalPlannerROS : public nav_core::BaseLocalPlanner, public mbf_costmap
         bool check_blocked_path                       = false;
         double blocked_path_detection_range           = 2.4;
         int lethal_cost                               = 254;
+        bool reset_when_new_plan_received             = false;
     } _params;
 
     boost::mutex config_mutex_;  //!< Mutex for config accesses and changes

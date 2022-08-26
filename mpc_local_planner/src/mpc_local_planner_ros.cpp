@@ -108,6 +108,7 @@ void MpcLocalPlannerROS::initialize(std::string name, tf2_ros::Buffer* tf, costm
         nh.param("controller/global_plan_viapoint_sep", _params.global_plan_viapoint_sep, _params.global_plan_viapoint_sep);
         _controller.setInitialPlanEstimateOrientation(_params.global_plan_overwrite_orientation);
         nh.param("controller/min_abs_vel_theta", _params.min_abs_vel_theta, _params.min_abs_vel_theta);
+        nh.param("controller/reset_when_new_plan_received", _params.reset_when_new_plan_received, _params.reset_when_new_plan_received);
 
         // special parameters
         nh.param("odom_topic", _params.odom_topic, _params.odom_topic);
@@ -248,6 +249,9 @@ bool MpcLocalPlannerROS::setPlan(const std::vector<geometry_msgs::PoseStamped>& 
     // store the global plan
     _global_plan.clear();
     _global_plan = orig_global_plan;
+
+    if(_params.reset_when_new_plan_received)
+        _controller.reset();
 
     // we do not clear the local planner here, since setPlan is called frequently whenever the global planner updates the plan.
     // the local planner checks whether it is required to reinitialize the trajectory or not within each velocity computation step.
