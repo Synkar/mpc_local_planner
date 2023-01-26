@@ -160,7 +160,7 @@ bool Controller::step(const std::vector<geometry_msgs::PoseStamped>& initial_pla
     {
         // generate custom initialization based on initial_plan
         // check if the goal is behind the start pose (w.r.t. start orientation)
-        bool backward = _guess_backwards_motion && (goal.position() - start.position()).dot(start.orientationUnitVec()) < 0;
+        bool backward = _guess_backwards_motion; //&& (goal.position() - start.position()).dot(start.orientationUnitVec()) < 0;
         generateInitialStateTrajectory(x, xf, initial_plan, backward);
     }
     corbo::Time time(t.toSec());
