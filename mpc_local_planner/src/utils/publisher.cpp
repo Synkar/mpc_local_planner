@@ -219,12 +219,21 @@ void Publisher::publishObstacles(const teb_local_planner::ObstContainer& obstacl
                 point.z = 0;
                 marker.points.push_back(point);
             }
-            marker.scale.x = 0.1;
-            marker.scale.y = 0.1;
-            marker.color.a = 1.0;
-            marker.color.r = 1.0;
-            marker.color.g = 0.0;
-            marker.color.b = 0.0;
+            if(obst->isDynamic()){
+                marker.scale.x = 0.1;
+                marker.scale.y = 0.1;
+                marker.color.a = 1.0;
+                marker.color.r = 0.0;
+                marker.color.g = 1.0;
+                marker.color.b = 0.0;
+            }else{
+                marker.scale.x = 0.1;
+                marker.scale.y = 0.1;
+                marker.color.a = 1.0;
+                marker.color.r = 1.0;
+                marker.color.g = 0.0;
+                marker.color.b = 0.0;
+            }
 
             _mpc_marker_pub.publish(marker);
         }
