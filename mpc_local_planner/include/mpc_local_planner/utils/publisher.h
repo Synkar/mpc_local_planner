@@ -143,6 +143,7 @@ class Publisher
     ros::Publisher _local_plan_pub;
     ros::Publisher _global_plan_pub;
     ros::Publisher _mpc_marker_pub;
+    ros::Publisher _mpc_marker_velocity_pub;
 };
 
 }  // namespace mpc_local_planner
