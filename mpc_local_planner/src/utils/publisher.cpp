@@ -110,6 +110,9 @@ void Publisher::publishObstacles(const teb_local_planner::ObstContainer& obstacl
 {
     if (obstacles.empty() || !_initialized) return;
 
+    visualization_msgs::MarkerArray velocity_marker_array;
+
+
     // Visualize point obstacles
     {
         visualization_msgs::Marker marker;
@@ -173,12 +176,50 @@ void Publisher::publishObstacles(const teb_local_planner::ObstContainer& obstacl
             end.z = 0;
             marker.points.push_back(end);
 
-            marker.scale.x = 0.1;
-            marker.scale.y = 0.1;
-            marker.color.a = 1.0;
-            marker.color.r = 0.0;
-            marker.color.g = 1.0;
-            marker.color.b = 0.0;
+            if(obst->isDynamic()){
+                marker.scale.x = 0.1;
+                marker.scale.y = 0.1;
+                marker.color.a = 1.0;
+                marker.color.r = 0.0;
+                marker.color.g = 1.0;
+                marker.color.b = 0.0;
+
+                visualization_msgs::Marker velocity_marker;
+                velocity_marker.header.frame_id = _map_frame;
+                velocity_marker.header.stamp = ros::Time::now();
+                velocity_marker.type = visualization_msgs::Marker::ARROW;
+                velocity_marker.action = visualization_msgs::Marker::ADD;
+                velocity_marker.id = marker.id;
+                geometry_msgs::Point start, end;
+                Eigen::Vector2d centroid = obst->getCentroid();
+                Eigen::Vector2d centroid_velocity = obst->getCentroidVelocity();
+                start.x = centroid.x();
+                start.y = centroid.y();
+                start.z = 0;
+                velocity_marker.points.push_back(start);
+                
+                end.x = centroid.x() + centroid_velocity.x();
+                end.y = centroid.y() + centroid_velocity.y();
+                end.z = 0;
+                velocity_marker.points.push_back(end);
+
+                velocity_marker.scale.x = 0.05;
+                velocity_marker.scale.y = 0.1;
+                velocity_marker.scale.z = 0;
+                velocity_marker.color.a = 1.0; 
+                velocity_marker.color.r = 1.0;
+                velocity_marker.color.g = 0.0;
+                velocity_marker.color.b = 0.0;
+                velocity_marker_array.markers.push_back(velocity_marker);
+
+            }else{
+                marker.scale.x = 0.1;
+                marker.scale.y = 0.1;
+                marker.color.a = 1.0;
+                marker.color.r = 1.0;
+                marker.color.g = 0.0;
+                marker.color.b = 0.0;
+            }
 
             _mpc_marker_pub.publish(marker);
         }
@@ -186,7 +227,6 @@ void Publisher::publishObstacles(const teb_local_planner::ObstContainer& obstacl
 
     // Visualize polygon obstacles
     {
-        visualization_msgs::MarkerArray velocity_marker_array;
 
         int idx = 0;
         for (const ObstaclePtr& obst : obstacles)
@@ -273,6 +313,94 @@ void Publisher::publishObstacles(const teb_local_planner::ObstContainer& obstacl
             _mpc_marker_pub.publish(marker);
         }
 
+    }
+
+
+    // Visualize Circular obstacles
+    {
+        visualization_msgs::MarkerArray velocity_marker_array;
+
+        int idx = 0;
+        for (const ObstaclePtr& obst : obstacles)
+        {   
+
+
+            // CircularObstacle::Ptr pobst = std::dynamic_pointer_cast<CircularObstacle>(obst);
+            boost::shared_ptr<CircularObstacle> pobst = boost::dynamic_pointer_cast<CircularObstacle>(obst);
+            if (!pobst) continue;
+
+            visualization_msgs::Marker marker;
+            marker.header.frame_id = _map_frame;
+            marker.header.stamp    = ros::Time::now();
+            marker.ns              = "CircularObstacles";
+            marker.id              = idx++;
+            marker.type            = visualization_msgs::Marker::LINE_STRIP;
+            marker.action          = visualization_msgs::Marker::ADD;
+            marker.lifetime        = ros::Duration(2.0);
+
+            int num_points = 36;
+            for (int i=0; i<=num_points; i++)
+            {
+
+                float angle = float(i)*M_PI/18.0;
+                geometry_msgs::Point point;
+                point.x = pobst->x() + pobst->radius()*cos(angle);
+                point.y = pobst->y() + pobst->radius()*sin(angle);
+                point.z = 0;
+                marker.points.push_back(point);
+            }
+
+            if(obst->isDynamic()){
+                marker.scale.x = 0.1;
+                marker.scale.y = 0.1;
+                marker.color.a = 1.0;
+                marker.color.r = 0.0;
+                marker.color.g = 1.0;
+                marker.color.b = 0.0;
+
+                visualization_msgs::Marker velocity_marker;
+                velocity_marker.header.frame_id = _map_frame;
+                velocity_marker.header.stamp = ros::Time::now();
+                velocity_marker.type = visualization_msgs::Marker::ARROW;
+                velocity_marker.action = visualization_msgs::Marker::ADD;
+                velocity_marker.id = marker.id;
+                geometry_msgs::Point start, end;
+                Eigen::Vector2d centroid = obst->getCentroid();
+                Eigen::Vector2d centroid_velocity = obst->getCentroidVelocity();
+                start.x = centroid.x();
+                start.y = centroid.y();
+                start.z = 0;
+                velocity_marker.points.push_back(start);
+                
+                end.x = centroid.x() + centroid_velocity.x();
+                end.y = centroid.y() + centroid_velocity.y();
+                end.z = 0;
+                velocity_marker.points.push_back(end);
+
+                velocity_marker.scale.x = 0.05;
+                velocity_marker.scale.y = 0.1;
+                velocity_marker.scale.z = 0;
+                velocity_marker.color.a = 1.0; 
+                velocity_marker.color.r = 1.0;
+                velocity_marker.color.g = 0.0;
+                velocity_marker.color.b = 0.0;
+                velocity_marker_array.markers.push_back(velocity_marker);
+
+            }else{
+                marker.scale.x = 0.1;
+                marker.scale.y = 0.1;
+                marker.color.a = 1.0;
+                marker.color.r = 1.0;
+                marker.color.g = 0.0;
+                marker.color.b = 0.0;
+            }
+
+            _mpc_marker_pub.publish(marker);
+        }
+
+    }
+
+    if(!velocity_marker_array.markers.empty()){
         _mpc_marker_velocity_pub.publish(velocity_marker_array);
     }
 }

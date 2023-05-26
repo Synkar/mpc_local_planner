@@ -642,6 +642,8 @@ void MpcLocalPlannerROS::updateObstacleContainerWithCustomObstacles()
             if (!_obstacles.empty())
                 _obstacles.back()->setCentroidVelocity(_custom_obstacle_msg.obstacles[i].velocities, _custom_obstacle_msg.obstacles[i].orientation);
         }
+
+        _custom_obstacle_msg.obstacles.clear();
     }
 }
 
