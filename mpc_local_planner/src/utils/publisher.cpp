@@ -318,8 +318,6 @@ void Publisher::publishObstacles(const teb_local_planner::ObstContainer& obstacl
 
     // Visualize Circular obstacles
     {
-        visualization_msgs::MarkerArray velocity_marker_array;
-
         int idx = 0;
         for (const ObstaclePtr& obst : obstacles)
         {   
