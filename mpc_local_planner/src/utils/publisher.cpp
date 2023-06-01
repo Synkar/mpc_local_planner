@@ -192,14 +192,15 @@ void Publisher::publishObstacles(const teb_local_planner::ObstContainer& obstacl
                 velocity_marker.id = marker.id;
                 geometry_msgs::Point start, end;
                 Eigen::Vector2d centroid = obst->getCentroid();
-                Eigen::Vector2d centroid_velocity = obst->getCentroidVelocity();
+                Eigen::Vector2d centroid_velocity;
+                obst->predictCentroidConstantVelocity(1.0,centroid_velocity);
                 start.x = centroid.x();
                 start.y = centroid.y();
                 start.z = 0;
                 velocity_marker.points.push_back(start);
                 
-                end.x = centroid.x() + centroid_velocity.x();
-                end.y = centroid.y() + centroid_velocity.y();
+                end.x = centroid_velocity.x();
+                end.y = centroid_velocity.y();
                 end.z = 0;
                 velocity_marker.points.push_back(end);
 
@@ -207,8 +208,8 @@ void Publisher::publishObstacles(const teb_local_planner::ObstContainer& obstacl
                 velocity_marker.scale.y = 0.1;
                 velocity_marker.scale.z = 0;
                 velocity_marker.color.a = 1.0; 
-                velocity_marker.color.r = 1.0;
-                velocity_marker.color.g = 0.0;
+                velocity_marker.color.r = 0.0;
+                velocity_marker.color.g = 1.0;
                 velocity_marker.color.b = 0.0;
                 velocity_marker_array.markers.push_back(velocity_marker);
 
@@ -281,14 +282,15 @@ void Publisher::publishObstacles(const teb_local_planner::ObstContainer& obstacl
                 velocity_marker.id = marker.id;
                 geometry_msgs::Point start, end;
                 Eigen::Vector2d centroid = obst->getCentroid();
-                Eigen::Vector2d centroid_velocity = obst->getCentroidVelocity();
+                Eigen::Vector2d centroid_velocity;
+                obst->predictCentroidConstantVelocity(1.0,centroid_velocity);
                 start.x = centroid.x();
                 start.y = centroid.y();
                 start.z = 0;
                 velocity_marker.points.push_back(start);
                 
-                end.x = centroid.x() + centroid_velocity.x();
-                end.y = centroid.y() + centroid_velocity.y();
+                end.x = centroid_velocity.x();
+                end.y = centroid_velocity.y();
                 end.z = 0;
                 velocity_marker.points.push_back(end);
 
@@ -296,8 +298,8 @@ void Publisher::publishObstacles(const teb_local_planner::ObstContainer& obstacl
                 velocity_marker.scale.y = 0.1;
                 velocity_marker.scale.z = 0;
                 velocity_marker.color.a = 1.0; 
-                velocity_marker.color.r = 1.0;
-                velocity_marker.color.g = 0.0;
+                velocity_marker.color.r = 0.0;
+                velocity_marker.color.g = 1.0;
                 velocity_marker.color.b = 0.0;
                 velocity_marker_array.markers.push_back(velocity_marker);
 
@@ -364,14 +366,15 @@ void Publisher::publishObstacles(const teb_local_planner::ObstContainer& obstacl
                 velocity_marker.id = marker.id;
                 geometry_msgs::Point start, end;
                 Eigen::Vector2d centroid = obst->getCentroid();
-                Eigen::Vector2d centroid_velocity = obst->getCentroidVelocity();
+                Eigen::Vector2d centroid_velocity;
+                obst->predictCentroidConstantVelocity(1.0,centroid_velocity);
                 start.x = centroid.x();
                 start.y = centroid.y();
                 start.z = 0;
                 velocity_marker.points.push_back(start);
                 
-                end.x = centroid.x() + centroid_velocity.x();
-                end.y = centroid.y() + centroid_velocity.y();
+                end.x = centroid_velocity.x();
+                end.y = centroid_velocity.y();
                 end.z = 0;
                 velocity_marker.points.push_back(end);
 
@@ -379,8 +382,8 @@ void Publisher::publishObstacles(const teb_local_planner::ObstContainer& obstacl
                 velocity_marker.scale.y = 0.1;
                 velocity_marker.scale.z = 0;
                 velocity_marker.color.a = 1.0; 
-                velocity_marker.color.r = 1.0;
-                velocity_marker.color.g = 0.0;
+                velocity_marker.color.r = 0.0;
+                velocity_marker.color.g = 1.0;
                 velocity_marker.color.b = 0.0;
                 velocity_marker_array.markers.push_back(velocity_marker);
 

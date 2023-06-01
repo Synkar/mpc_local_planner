@@ -578,9 +578,10 @@ void MpcLocalPlannerROS::updateObstacleContainerWithCustomObstacles()
     {
         // We only use the global header to specify the obstacle coordinate system instead of individual ones
         Eigen::Affine3d obstacle_to_map_eig;
+        geometry_msgs::TransformStamped obstacle_to_map;
         try
         {
-            geometry_msgs::TransformStamped obstacle_to_map =
+            obstacle_to_map =
                 _tf->lookupTransform(_global_frame, ros::Time(0), _custom_obstacle_msg.header.frame_id, ros::Time(0),
                                      _custom_obstacle_msg.header.frame_id, ros::Duration(0.5));
             obstacle_to_map_eig = tf2::transformToEigen(obstacle_to_map);
@@ -589,6 +590,7 @@ void MpcLocalPlannerROS::updateObstacleContainerWithCustomObstacles()
         {
             ROS_ERROR("%s", ex.what());
             obstacle_to_map_eig.setIdentity();
+            obstacle_to_map = tf2::eigenToTransform(obstacle_to_map_eig);
         }
 
         for (size_t i = 0; i < _custom_obstacle_msg.obstacles.size(); ++i)
@@ -639,8 +641,28 @@ void MpcLocalPlannerROS::updateObstacleContainerWithCustomObstacles()
             }
 
             // Set velocity, if obstacle is moving
-            if (!_obstacles.empty())
-                _obstacles.back()->setCentroidVelocity(_custom_obstacle_msg.obstacles[i].velocities, _custom_obstacle_msg.obstacles[i].orientation);
+            if (!_obstacles.empty()){
+                tf2::Stamped< tf2::Transform > transform;
+                tf2::convert(obstacle_to_map, transform);
+                geometry_msgs::Twist twist_msg = _custom_obstacle_msg.obstacles[i].velocities.twist;
+
+                tf2::Vector3 twist_rot(  twist_msg.angular.x,
+                                        twist_msg.angular.y,
+                                        twist_msg.angular.z);
+                tf2::Vector3 twist_vel(  twist_msg.linear.x,
+                                        twist_msg.linear.y,
+                                        twist_msg.linear.z);
+                tf2::Vector3 out_rot = transform.getBasis() * twist_rot;
+                tf2::Vector3 out_vel = transform.getBasis()* twist_vel + transform.getOrigin().cross(out_rot);
+
+                geometry_msgs::TwistWithCovariance twist_with_covariance_msg = _custom_obstacle_msg.obstacles[i].velocities;
+                tf2::convert(out_vel, twist_with_covariance_msg.twist.linear);
+                tf2::convert(out_rot, twist_with_covariance_msg.twist.angular);
+
+                geometry_msgs::Quaternion orientation;
+                tf2::doTransform(_custom_obstacle_msg.obstacles[i].orientation, orientation, obstacle_to_map);
+                _obstacles.back()->setCentroidVelocity(twist_with_covariance_msg, orientation);
+            }
         }
 
         _custom_obstacle_msg.obstacles.clear();
