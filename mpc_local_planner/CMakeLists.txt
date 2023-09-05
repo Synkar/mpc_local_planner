@@ -135,9 +135,9 @@ set(EXTERNAL_INCLUDE_DIRS ${EIGEN3_INCLUDE_DIR})
 #add dynamic reconfigure api
 #find_package(catkin REQUIRED dynamic_reconfigure)
 generate_dynamic_reconfigure_options(
-  cfg/mpc_collision.cfg
-  cfg/mpc_controller.cfg
-  cfg/mpc_footprint.cfg
+  cfg/CollisionReconfigure.cfg
+  cfg/ControllerReconfigure.cfg
+  cfg/FootprintReconfigure.cfg
 )
 
 ###################################
@@ -255,7 +255,7 @@ install(TARGETS test_mpc_optim_node
 ## Mark cpp header files for installation
 install(DIRECTORY include/${PROJECT_NAME}/
    DESTINATION ${CATKIN_PACKAGE_INCLUDE_DESTINATION}
-   #FILES_MATCHING PATTERN "*.h"
+   FILES_MATCHING PATTERN "*.h"
    PATTERN ".svn" EXCLUDE
 )
 
