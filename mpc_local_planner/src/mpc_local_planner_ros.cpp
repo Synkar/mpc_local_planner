@@ -796,7 +796,18 @@ bool MpcLocalPlannerROS::transformGlobalPlan(const tf2_ros::Buffer& tf, const st
 
         // let's get the pose of the robot in the frame of the plan
         geometry_msgs::PoseStamped robot_pose;
-        tf.transform(global_pose, robot_pose, plan_pose.header.frame_id);
+        geometry_msgs::TransformStamped tf_global_to_plan;
+
+        if (tf.canTransform(plan_pose.header.frame_id, global_pose.header.frame_id, global_pose.header.stamp, ros::Duration(0.5))) {
+            tf_global_to_plan = tf.lookupTransform(plan_pose.header.frame_id,
+                                                global_pose.header.frame_id,
+                                                global_pose.header.stamp);
+
+            tf2::doTransform(global_pose, robot_pose, tf_global_to_plan);
+        } else {
+            ROS_WARN("Cannot transform global pose to plan frame.");
+            return false;
+        }
 
         // we'll discard points on the plan that are outside the local costmap
         double dist_threshold =
