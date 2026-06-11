@@ -170,8 +170,12 @@ class MpcLocalPlannerROS : public nav_core::BaseLocalPlanner, public mbf_costmap
      * @brief Requests the planner to cancel, e.g. if it takes too much time
      * @remark New on MBF API
      * @return True if a cancel has been successfully requested, false if not implemented.
+     *
+     * Do not reset the controller here: MBF may call cancel from a different thread while
+     * computeVelocityCommands is still inside _controller.step(), and resetting mid-flight
+     * triggers "pure virtual method called" during corbo/ipopt teardown.
      */
-    bool cancel() { _controller.reset(); return false; };
+    bool cancel() { return false; };
 
     /** @name Public utility functions/methods */
     //@{
