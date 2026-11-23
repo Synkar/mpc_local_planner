@@ -29,6 +29,8 @@
 
 #include <boost/algorithm/string.hpp>
 
+#include <algorithm>
+
 // MBF return codes
 #include <mbf_msgs/ExePathResult.h>
 
@@ -68,6 +70,10 @@ void MpcLocalPlannerROS::reconfigureControllerCB(ControllerReconfigureConfig& co
     _params.global_plan_prune_distance             = config.global_plan_prune_distance;
     _params.max_global_plan_lookahead_dist         = config.max_global_plan_lookahead_dist;
     _params.global_plan_viapoint_sep               = config.global_plan_viapoint_sep;
+
+    // Only stored here; Controller::step applies it on the control thread before the next solve
+    if (!_controller.setMaxVelX(config.max_vel_x))
+        ROS_WARN_STREAM("mpc_local_planner: ignoring max_vel_x " << config.max_vel_x << ", it must be > 0");
 }
 
 void MpcLocalPlannerROS::reconfigureFootprintCB(FootprintReconfigureConfig& config, uint32_t level)
@@ -196,6 +202,9 @@ void MpcLocalPlannerROS::initialize(std::string name, tf2_ros::Buffer* tf, costm
 
         // setup dynamic reconfigure
         ros::NodeHandle controller_nh(nh, "controller");
+        // Seed max_vel_x with the robot model limit already loaded into the OCP, so the first callback
+        // (fired by setCallback) keeps it instead of replacing it with the cfg default
+        controller_nh.setParam("max_vel_x", _controller.getMaxVelX());
         dynamic_controller_recfg_ = boost::make_shared<dynamic_reconfigure::Server<ControllerReconfigureConfig>>(controller_nh);
         dynamic_reconfigure::Server<ControllerReconfigureConfig>::CallbackType controller_cb =
             boost::bind(&MpcLocalPlannerROS::reconfigureControllerCB, this, _1, _2);
@@ -456,8 +465,17 @@ uint32_t MpcLocalPlannerROS::computeVelocityCommands(const geometry_msgs::PoseSt
 
     // Get the velocity command for this sampling interval
     // TODO(roesmann): we might also command more than just the imminent action, e.g. in a separate thread, until a new command is available
-    if (!_u_seq || !_controller.getRobotDynamics()->getTwistFromControl(_u_seq->getValuesMap(0), cmd_vel.twist))
-    {   
+    // Clamp the forward velocity to the active max_vel_x before the conversion, so a warm-started cycle cannot command
+    // faster than a limit lowered in this cycle (clamping the control keeps the curvature consistent for car-like models)
+    bool cmd_valid = false;
+    if (_u_seq && !_u_seq->isEmpty())
+    {
+        Eigen::VectorXd u0 = _u_seq->getValuesMap(0);
+        if (u0.size() > 0) u0[0] = std::min(u0[0], _controller.getMaxVelX());
+        cmd_valid = _controller.getRobotDynamics()->getTwistFromControl(u0, cmd_vel.twist);
+    }
+    if (!cmd_valid)
+    {
         _controller.reset();
         ROS_WARN("MpcLocalPlannerROS: velocity command invalid. Resetting controller...");
         ++_no_infeasible_plans;  // increase number of infeasible solutions in a row
