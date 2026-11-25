@@ -34,6 +34,7 @@
 #include <mpc_local_planner/optimal_control/fd_collocation_se2.h>
 #include <mpc_local_planner/optimal_control/final_state_conditions_se2.h>
 #include <mpc_local_planner/optimal_control/finite_differences_variable_grid_se2.h>
+#include <mpc_local_planner/optimal_control/full_discretization_grid_base_se2.h>
 #include <mpc_local_planner/optimal_control/min_time_via_points_cost.h>
 #include <mpc_local_planner/optimal_control/quadratic_cost_se2.h>
 #include <mpc_local_planner/optimal_control/stage_inequality_se2.h>
@@ -169,6 +170,8 @@ bool Controller::step(const std::vector<geometry_msgs::PoseStamped>& initial_pla
     corbo::StaticReference xref(xf);  // currently, we only support point-to-point transitions in ros
     corbo::ZeroReference uref(_dynamics->getInputDimension());
 
+    applyRequestedMaxVelX();
+
     _ocp_successful = PredictiveController::step(x, xref, uref, corbo::Duration(dt), time, u_seq, x_seq, nullptr, nullptr, &_x_seq_init);
     // publish results if desired
     if (_publish_ocp_results) publishOptimalControlResult();  // TODO(roesmann): we could also pass time t from above
@@ -176,6 +179,36 @@ bool Controller::step(const std::vector<geometry_msgs::PoseStamped>& initial_pla
     ++_ocp_seq;
     _last_goal = goal;
     return _ocp_successful;
+}
+
+void Controller::applyRequestedMaxVelX()
+{
+    const double requested = _requested_max_vel_x.load();
+    if (requested == _max_vel_x) return;
+
+    const corbo::NlpFunctions& functions = _structured_ocp->getNlpFunctions();
+    if (functions.u_ub.size() < 1 || functions.u_lb.size() != functions.u_ub.size())
+    {
+        ROS_ERROR_STREAM_THROTTLE(5.0, "Controller: cannot apply max_vel_x " << requested << ", the OCP control bounds are not set.");
+        return;
+    }
+
+    // Only the forward velocity changes; backwards velocity and yaw rate or steering bounds stay as configured.
+    // Vertices created from now on (initialization, grid resampling) take these OCP bounds.
+    Eigen::VectorXd u_lb = functions.u_lb;
+    Eigen::VectorXd u_ub = functions.u_ub;
+    u_ub[0]              = requested;
+    _structured_ocp->setControlBounds(u_lb, u_ub);
+
+    // Warm start keeps the control vertices that already exist, with the bounds copied when they were created.
+    FullDiscretizationGridBaseSE2::Ptr grid = std::dynamic_pointer_cast<FullDiscretizationGridBaseSE2>(_grid);
+    if (grid)
+        grid->setControlUpperBound(0, requested);
+    else
+        _grid->clear();  // unknown grid type: rebuild the vertices from the new OCP bounds
+
+    ROS_INFO_STREAM("Controller: max_vel_x " << _max_vel_x << " -> " << requested << " m/s");
+    _max_vel_x = requested;
 }
 
 void Controller::stateFeedbackCallback(const mpc_local_planner_msgs::StateFeedback::ConstPtr& msg)
@@ -509,6 +542,7 @@ corbo::StructuredOptimalControlProblem::Ptr Controller::configureOcp(const ros::
         //               Eigen::Vector3d(corbo::CORBO_INF_DBL, corbo::CORBO_INF_DBL, corbo::CORBO_INF_DBL),
         //               Eigen::Vector2d(-max_vel_x_backwards, -max_vel_theta), Eigen::Vector2d(max_vel_x, max_vel_theta));
         ocp->setControlBounds(Eigen::Vector2d(-max_vel_x_backwards, -max_vel_theta), Eigen::Vector2d(max_vel_x, max_vel_theta));
+        _max_vel_x = max_vel_x;
     }
     else if (_robot_type == "simple_car")
     {
@@ -525,6 +559,7 @@ corbo::StructuredOptimalControlProblem::Ptr Controller::configureOcp(const ros::
         nh.param("robot/simple_car/max_steering_angle", max_steering_angle, max_steering_angle);
 
         ocp->setControlBounds(Eigen::Vector2d(-max_vel_x_backwards, -max_steering_angle), Eigen::Vector2d(max_vel_x, max_steering_angle));
+        _max_vel_x = max_vel_x;
     }
     else if (_robot_type == "kinematic_bicycle_vel_input")
     {
@@ -541,12 +576,14 @@ corbo::StructuredOptimalControlProblem::Ptr Controller::configureOcp(const ros::
         nh.param("robot/kinematic_bicycle_vel_input/max_steering_angle", max_steering_angle, max_steering_angle);
 
         ocp->setControlBounds(Eigen::Vector2d(-max_vel_x_backwards, -max_steering_angle), Eigen::Vector2d(max_vel_x, max_steering_angle));
+        _max_vel_x = max_vel_x;
     }
     else
     {
         ROS_ERROR_STREAM("Cannot configure OCP for unknown robot type " << _robot_type << ".");
         return {};
     }
+    _requested_max_vel_x = _max_vel_x;  // nothing pending until setMaxVelX()
 
     std::string objective_type = "minimum_time";
     nh.param("planning/objective/type", objective_type, objective_type);

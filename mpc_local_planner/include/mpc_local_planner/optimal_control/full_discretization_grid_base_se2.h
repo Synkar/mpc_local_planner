@@ -179,6 +179,19 @@ class FullDiscretizationGridBaseSE2 : public corbo::DiscretizationGridInterface
     // implements interface method
     void getVertices(std::vector<VertexInterface*>& vertices) override;
 
+    /**
+     * @brief Set the upper bound of one control component on the control vertices that already exist.
+     *
+     * Warm start and grid resampling keep the bounds copied when a vertex was created, so a new limit
+     * set only in the OCP would not reach them. Vertices created later take nlp_fun.u_ub, so update
+     * the OCP control bounds as well. Unlike updateBounds(), state bounds and the other control
+     * components are left untouched.
+     *
+     * @param idx  Control component (0 is the forward velocity for all robot models)
+     * @param ub   New upper bound
+     */
+    void setControlUpperBound(int idx, double ub);
+
  protected:
     virtual void initializeSequences(const Eigen::VectorXd& x0, const Eigen::VectorXd& xf, ReferenceTrajectoryInterface& uref, NlpFunctions& nlp_fun);
     virtual void initializeSequences(const Eigen::VectorXd& x0, const Eigen::VectorXd& xf, ReferenceTrajectoryInterface& xref,

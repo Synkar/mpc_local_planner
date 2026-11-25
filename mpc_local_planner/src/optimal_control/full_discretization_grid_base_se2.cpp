@@ -437,6 +437,17 @@ void FullDiscretizationGridBaseSE2::updateBounds(const NlpFunctions& nlp_fun)
     _nlp_fun = &nlp_fun;  // for bound access in e.g. resampleTrajectory()
 }
 
+void FullDiscretizationGridBaseSE2::setControlUpperBound(int idx, double ub)
+{
+    for (VectorVertex& vtx : _u_seq)
+    {
+        if (idx >= 0 && idx < vtx.getDimension())
+            vtx.setUpperBound(idx, ub);
+        else
+            PRINT_ERROR_NAMED("Cannot update upper control input bound due to dimensions mismatch");
+    }
+}
+
 void FullDiscretizationGridBaseSE2::resampleTrajectory(int n_new)
 {
     assert(isValid());

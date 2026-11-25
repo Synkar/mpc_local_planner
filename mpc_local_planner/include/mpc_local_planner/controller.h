@@ -38,6 +38,7 @@
 #include <ros/subscriber.h>
 #include <ros/time.h>
 
+#include <atomic>
 #include <memory>
 #include <mutex>
 
@@ -82,6 +83,25 @@ class Controller : public corbo::PredictiveController
     void setInitialPlanEstimateOrientation(bool estimate) { _initial_plan_estimate_orientation = estimate; }
 
     /**
+     * @brief Request a new forward velocity limit (upper bound of control component 0).
+     *
+     * Safe to call from another thread (e.g. dynamic reconfigure): it only stores the value.
+     * step() applies it to the OCP control bounds and the existing control vertices before the next solve.
+     * The backwards velocity and the yaw rate or steering bounds stay as configured.
+     *
+     * @return false if max_vel_x is not greater than 0 (the request is ignored)
+     */
+    bool setMaxVelX(double max_vel_x)
+    {
+        if (!(max_vel_x > 0)) return false;
+        _requested_max_vel_x = max_vel_x;
+        return true;
+    }
+
+    //! Forward velocity limit currently applied to the OCP: robot/<type>/max_vel_x until a request is applied
+    double getMaxVelX() const { return _max_vel_x; }
+
+    /**
      * @brief Check whether the planned trajectory is feasible or not.
      *
      * This method currently checks only that the trajectory, or a part of the trajectory is collision free.
@@ -114,6 +134,9 @@ class Controller : public corbo::PredictiveController
     bool generateInitialStateTrajectory(const Eigen::VectorXd& x0, const Eigen::VectorXd& xf,
                                         const std::vector<geometry_msgs::PoseStamped>& initial_plan, bool backward);
 
+    //! Apply a pending setMaxVelX() request; runs on the control thread before the solve
+    void applyRequestedMaxVelX();
+
     std::string _robot_type;
     corbo::DiscretizationGridInterface::Ptr _grid;
     RobotDynamicsInterface::Ptr _dynamics;
@@ -140,6 +163,9 @@ class Controller : public corbo::PredictiveController
     bool _initial_plan_estimate_orientation = true;
     bool _guess_backwards_motion            = true;
     int _force_reinit_num_steps             = 0;
+
+    double _max_vel_x = 0.4;                        // forward velocity bound applied to the OCP (control thread only)
+    std::atomic<double> _requested_max_vel_x{0.4};  // written by setMaxVelX(), applied in step()
 };
 
 }  // namespace mpc_local_planner
